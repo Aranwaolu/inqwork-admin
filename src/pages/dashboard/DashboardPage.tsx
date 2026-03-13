@@ -1,7 +1,8 @@
 import PageHeader from '@/components/layout/PageHeader'
 import StatCard from '@/components/common/StatCard'
 import ChartBox from '@/components/common/ChartBox'
-import Skeleton from '@/components/ui/Skeleton'
+import { useStories } from '@/hooks/useAdminStories'
+import { useFeaturedPlacements } from '@/hooks/useAdminFeatured'
 import type { EChartsOption } from 'echarts'
 
 const userGrowthOption: EChartsOption = {
@@ -42,7 +43,15 @@ const contentTypeOption: EChartsOption = {
 }
 
 export default function DashboardPage() {
-  const isLoading = true
+  const storiesQuery = useStories({ pageSize: 1 })
+  const draftsQuery = useStories({ pageSize: 1, status: 'DRAFT' })
+  const featuredQuery = useFeaturedPlacements({ pageSize: 1 })
+
+  const isLoading = storiesQuery.isLoading || draftsQuery.isLoading || featuredQuery.isLoading
+
+  const totalStories = storiesQuery.data?.page?.totalElements
+  const draftStories = draftsQuery.data?.page?.totalElements
+  const featuredCount = featuredQuery.data?.page?.totalElements
 
   return (
     <div>
@@ -50,10 +59,34 @@ export default function DashboardPage() {
 
       {/* Stat cards */}
       <div className="grid grid-cols-4 gap-5 mb-6">
-        <StatCard label="Total Stories" value="—" icon="auto_stories" color="#5e17eb" isLoading={isLoading} />
-        <StatCard label="Total Users" value="—" icon="group" color="#0ea5e9" isLoading={isLoading} />
-        <StatCard label="Pending Reviews" value="—" icon="pending_actions" color="#f59e0b" isLoading={isLoading} />
-        <StatCard label="Active Creators" value="—" icon="edit_note" color="#10b981" isLoading={isLoading} />
+        <StatCard
+          label="Total Stories"
+          value={totalStories?.toLocaleString() ?? '—'}
+          icon="auto_stories"
+          color="#5e17eb"
+          isLoading={storiesQuery.isLoading}
+        />
+        <StatCard
+          label="Draft Stories"
+          value={draftStories?.toLocaleString() ?? '—'}
+          icon="pending_actions"
+          color="#f59e0b"
+          isLoading={draftsQuery.isLoading}
+        />
+        <StatCard
+          label="Featured"
+          value={featuredCount?.toLocaleString() ?? '—'}
+          icon="star"
+          color="#0ea5e9"
+          isLoading={featuredQuery.isLoading}
+        />
+        <StatCard
+          label="Active Creators"
+          value="—"
+          icon="edit_note"
+          color="#10b981"
+          isLoading={false}
+        />
       </div>
 
       {/* Charts */}
@@ -62,20 +95,11 @@ export default function DashboardPage() {
         <ChartBox title="Content by Type" subtitle="Distribution" option={contentTypeOption} isLoading={isLoading} />
       </div>
 
-      {/* Recent Activity skeleton */}
+      {/* Placeholder for future analytics */}
       <div className="rounded-xl bg-white shadow-sm border border-gray-100 p-5">
-        <h3 className="text-base font-semibold text-gray-900 mb-4">Recent Activity</h3>
-        <div className="space-y-3">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="flex items-center gap-3">
-              <Skeleton variant="circle" width="3.2rem" height="3.2rem" />
-              <div className="flex-1 space-y-1.5">
-                <Skeleton width="70%" />
-                <Skeleton width="40%" height="1.2rem" />
-              </div>
-            </div>
-          ))}
-        </div>
+        <p className="text-sm text-gray-500 text-center py-4">
+          Analytics endpoints coming soon
+        </p>
       </div>
     </div>
   )
