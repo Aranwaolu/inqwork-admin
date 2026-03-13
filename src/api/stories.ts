@@ -1,32 +1,61 @@
 import axiosInstance from '@/api'
-import type { PaginatedData, RequestQueryParams } from '@/types/api'
-import type { Story, Episode } from '@/types/story'
+import type { PaginatedData } from '@/types/api'
+import type {
+  Story,
+  Episode,
+  CreateStoryPayload,
+  UpdateStoryPayload,
+  UpdateStoryTagsPayload,
+} from '@/types/story'
+
+export interface StoryQueryParams {
+  q?: string
+  format?: string
+  status?: string
+  genre?: string
+  sort?: string
+  pageNo?: number
+  pageSize?: number
+}
 
 const storiesService = {
-  getAll(params?: RequestQueryParams) {
-    return axiosInstance.get<PaginatedData<Story>>('/admin/stories', { params })
+  getAll(params?: StoryQueryParams) {
+    return axiosInstance.get<PaginatedData<Story>>('/stories', { params })
   },
 
-  getById(id: number) {
-    return axiosInstance.get<Story>(`/admin/stories/${id}`)
+  getBySlug(slug: string) {
+    return axiosInstance.get<Story>(`/stories/${slug}`)
   },
 
-  getEpisodes(storyId: number) {
-    return axiosInstance.get<Episode[]>(`/admin/stories/${storyId}/episodes`)
+  create(data: CreateStoryPayload) {
+    return axiosInstance.post<Story>('/stories', data)
   },
 
-  updateStatus(id: number, status: string) {
-    return axiosInstance.patch(`/admin/stories/${id}/status`, { status })
+  update(slug: string, data: UpdateStoryPayload) {
+    return axiosInstance.patch<Story>(`/stories/${slug}`, data)
   },
 
-  remove(id: number) {
-    return axiosInstance.delete(`/admin/stories/${id}`)
+  publish(slug: string) {
+    return axiosInstance.post(`/stories/${slug}/publish`)
   },
 
-  upload(formData: FormData) {
-    return axiosInstance.post<Story>('/admin/stories', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+  schedule(slug: string, scheduledFor: string) {
+    return axiosInstance.post(`/stories/${slug}/schedule`, { scheduledFor })
+  },
+
+  archive(slug: string) {
+    return axiosInstance.post(`/stories/${slug}/archive`)
+  },
+
+  updateTags(slug: string, data: UpdateStoryTagsPayload) {
+    return axiosInstance.put(`/stories/${slug}/tags`, data)
+  },
+
+  getEpisodes(slug: string, params?: { pageNo?: number; pageSize?: number }) {
+    return axiosInstance.get<PaginatedData<Episode>>(
+      `/stories/${slug}/episodes`,
+      { params },
+    )
   },
 }
 

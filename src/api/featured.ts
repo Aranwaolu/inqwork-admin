@@ -1,29 +1,45 @@
 import axiosInstance from '@/api'
-import type { FeaturedItem } from '@/types/featured'
+import type { PaginatedData } from '@/types/api'
+import type {
+  FeaturedPlacement,
+  CreateFeaturedDto,
+  UpdateFeaturedDto,
+  PlacementType,
+} from '@/types/featured'
+
+export interface FeaturedQueryParams {
+  placementType?: PlacementType
+  isActive?: boolean
+  storyId?: number
+  pageNo?: number
+  pageSize?: number
+}
 
 const featuredService = {
-  getAll() {
-    return axiosInstance.get<FeaturedItem[]>('/admin/featured')
+  getAll(params?: FeaturedQueryParams) {
+    return axiosInstance.get<PaginatedData<FeaturedPlacement>>(
+      '/featured-placements',
+      { params },
+    )
   },
 
-  create(formData: FormData) {
-    return axiosInstance.post<FeaturedItem>('/admin/featured', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+  getById(id: number) {
+    return axiosInstance.get<FeaturedPlacement>(`/featured-placements/${id}`)
   },
 
-  update(id: number, formData: FormData) {
-    return axiosInstance.patch<FeaturedItem>(`/admin/featured/${id}`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+  create(data: CreateFeaturedDto) {
+    return axiosInstance.post<FeaturedPlacement>('/featured-placements', data)
   },
 
-  reorder(id: number, position: number) {
-    return axiosInstance.patch(`/admin/featured/${id}/reorder`, { position })
+  update(id: number, data: UpdateFeaturedDto) {
+    return axiosInstance.patch<FeaturedPlacement>(
+      `/featured-placements/${id}`,
+      data,
+    )
   },
 
   remove(id: number) {
-    return axiosInstance.delete(`/admin/featured/${id}`)
+    return axiosInstance.delete(`/featured-placements/${id}`)
   },
 }
 

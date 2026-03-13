@@ -14,8 +14,8 @@ export const SIDEBAR_WIDTH_EXPANDED = 260
 export const SIDEBAR_WIDTH_COLLAPSED = 77
 export const TOPBAR_HEIGHT = 64
 
-export const STORY_TYPES = ['NOVEL', 'COMIC', 'SHORT_STORY'] as const
-export const STORY_STATUSES = ['DRAFT', 'PENDING_REVIEW', 'PUBLISHED', 'REJECTED', 'ARCHIVED'] as const
+export const STORY_FORMATS = ['NOVEL', 'SHORT_STORY', 'POEM', 'COMIC'] as const
+export const STORY_STATUSES = ['DRAFT', 'SCHEDULED', 'PUBLISHED', 'ARCHIVED'] as const
 export const STORY_GENRES = [
   'Fantasy',
   'Sci-Fi',
