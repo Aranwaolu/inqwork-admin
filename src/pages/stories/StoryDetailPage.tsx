@@ -3,31 +3,55 @@ import Breadcrumbs from '@/components/layout/Breadcrumbs'
 import Skeleton from '@/components/ui/Skeleton'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
-import Select from '@/components/ui/Select'
 import DataTable, { type Column } from '@/components/common/DataTable'
 import type { Episode } from '@/types/story'
-import { STORY_STATUSES } from '@/utils/constants'
+import { useStory, useEpisodes, usePublishStory, useArchiveStory } from '@/hooks/useAdminStories'
+import { formatDate } from '@/utils/format'
 
-const statusOptions = STORY_STATUSES.map((s) => ({ label: s.replace('_', ' '), value: s }))
+const statusVariant: Record<string, 'default' | 'success' | 'warning' | 'error' | 'info'> = {
+  DRAFT: 'default',
+  SCHEDULED: 'warning',
+  PUBLISHED: 'success',
+  ARCHIVED: 'info',
+}
 
 const episodeColumns: Column<Episode>[] = [
-  { key: 'number', label: '#', width: '60px' },
+  { key: 'episodeNumber', label: '#', width: '60px' },
   { key: 'title', label: 'Title', render: (row) => <span className="font-medium">{row.title}</span> },
   {
     key: 'status',
     label: 'Status',
     render: (row) => <Badge variant={row.status === 'PUBLISHED' ? 'success' : 'default'}>{row.status}</Badge>,
   },
-  { key: 'createdAt', label: 'Created' },
+  {
+    key: 'isFree',
+    label: 'Free',
+    render: (row) => (row.isFree ? <Badge variant="success">Free</Badge> : <Badge variant="default">Paid</Badge>),
+  },
+  {
+    key: 'createdAt',
+    label: 'Created',
+    render: (row) => formatDate(row.createdAt),
+  },
 ]
 
 export default function StoryDetailPage() {
   const { id } = useParams()
-  const isLoading = true
+  const { data: story, isLoading } = useStory(id!)
+  const { data: episodesData, isLoading: episodesLoading } = useEpisodes(id!)
+  const publishMutation = usePublishStory()
+  const archiveMutation = useArchiveStory()
+
+  const episodes = episodesData?.content ?? []
 
   return (
     <div>
-      <Breadcrumbs items={[{ label: 'Stories', href: '/stories' }, { label: `Story #${id}` }]} />
+      <Breadcrumbs
+        items={[
+          { label: 'Stories', href: '/stories' },
+          { label: story?.title ?? `Story` },
+        ]}
+      />
 
       <div className="grid grid-cols-3 gap-6">
         {/* Left: Details + Episodes */}
@@ -45,8 +69,31 @@ export default function StoryDetailPage() {
                   <Skeleton width="6rem" height="2rem" />
                 </div>
               </div>
+            ) : story ? (
+              <div className="space-y-4">
+                <h3 className="text-xl font-bold text-gray-900">{story.title}</h3>
+                <p className="text-sm text-gray-600">{story.description || 'No description provided.'}</p>
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="brand">{story.format.replace('_', ' ')}</Badge>
+                  <Badge variant={statusVariant[story.status]}>{story.status.replace('_', ' ')}</Badge>
+                  <Badge variant="info">{story.publishingState}</Badge>
+                  <Badge variant="default">{story.contentRating}</Badge>
+                </div>
+                {story.primaryGenre && (
+                  <p className="text-sm text-gray-500">
+                    <span className="font-medium text-gray-700">Genre:</span> {story.primaryGenre}
+                  </p>
+                )}
+                {story.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {story.tags.map((tag) => (
+                      <Badge key={tag.id} variant="default">{tag.name}</Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
             ) : (
-              <p className="text-sm text-gray-500">Story details will load from the API.</p>
+              <p className="text-sm text-gray-500">Story not found.</p>
             )}
           </div>
 
@@ -55,8 +102,8 @@ export default function StoryDetailPage() {
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Episodes</h2>
             <DataTable<Episode>
               columns={episodeColumns}
-              data={[]}
-              isLoading={isLoading}
+              data={episodes}
+              isLoading={episodesLoading}
               skeletonRows={3}
               emptyTitle="No episodes yet"
               emptyDescription="Episodes will appear once the creator uploads them."
@@ -64,13 +111,19 @@ export default function StoryDetailPage() {
           </div>
         </div>
 
-        {/* Right: Cover + Actions */}
+        {/* Right: Cover + Author + Actions */}
         <div className="space-y-6">
           {/* Cover image */}
           <div className="rounded-xl bg-white shadow-sm border border-gray-100 p-6">
             <h3 className="text-sm font-semibold text-gray-900 mb-3">Cover Image</h3>
             {isLoading ? (
               <Skeleton variant="rectangle" height="20rem" />
+            ) : story?.coverImageUrl ? (
+              <img
+                src={story.coverImageUrl}
+                alt={story.title}
+                className="w-full h-80 rounded-lg object-cover"
+              />
             ) : (
               <div className="h-80 rounded-lg bg-gray-100 flex items-center justify-center text-gray-400 text-sm">
                 No cover image
@@ -87,19 +140,45 @@ export default function StoryDetailPage() {
                 <Skeleton width="30%" />
                 <Skeleton width="60%" />
               </div>
-            ) : (
-              <p className="text-sm text-gray-500">Author info will load from the API.</p>
-            )}
+            ) : story ? (
+              <div className="space-y-3 text-sm">
+                <div className="flex items-center gap-2">
+                  {story.creator?.avatarUrl && (
+                    <img src={story.creator.avatarUrl} alt="" className="h-8 w-8 rounded-full object-cover" />
+                  )}
+                  <span className="font-medium text-gray-900">{story.creator?.displayName ?? 'Unknown'}</span>
+                </div>
+                <div className="text-gray-600 space-y-1">
+                  <p>Episodes: <span className="font-medium text-gray-900">{story.episodesCount}</span></p>
+                  <p>Published: <span className="font-medium text-gray-900">{story.publishedEpisodesCount}</span></p>
+                  <p>Bookmarks: <span className="font-medium text-gray-900">{story.bookmarkCount}</span></p>
+                  {story.lastPublishedAt && (
+                    <p>Last published: <span className="font-medium text-gray-900">{formatDate(story.lastPublishedAt)}</span></p>
+                  )}
+                </div>
+              </div>
+            ) : null}
           </div>
 
           {/* Moderation Actions */}
           <div className="rounded-xl bg-white shadow-sm border border-gray-100 p-6">
             <h3 className="text-sm font-semibold text-gray-900 mb-3">Moderation</h3>
             <div className="space-y-3">
-              <Select label="Status" options={statusOptions} value="" onChange={() => {}} />
-              <Button fullWidth>Update Status</Button>
-              <Button variant="danger" fullWidth icon="delete">
-                Remove Story
+              <Button
+                fullWidth
+                onClick={() => id && publishMutation.mutate(id)}
+                disabled={publishMutation.isPending || story?.status === 'PUBLISHED'}
+              >
+                {publishMutation.isPending ? 'Publishing...' : 'Publish Story'}
+              </Button>
+              <Button
+                variant="danger"
+                fullWidth
+                icon="archive"
+                onClick={() => id && archiveMutation.mutate(id)}
+                disabled={archiveMutation.isPending || story?.status === 'ARCHIVED'}
+              >
+                {archiveMutation.isPending ? 'Archiving...' : 'Archive Story'}
               </Button>
             </div>
           </div>

@@ -2,47 +2,106 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useState, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
+import toast from 'react-hot-toast'
 import Breadcrumbs from '@/components/layout/Breadcrumbs'
 import Input from '@/components/ui/Input'
 import Textarea from '@/components/ui/Textarea'
 import Select from '@/components/ui/Select'
 import Button from '@/components/ui/Button'
 import GoogleMaterialIcon from '@/components/ui/icons/GoogleMaterialIcon'
-import { STORY_TYPES, STORY_GENRES } from '@/utils/constants'
+import { STORY_FORMATS, STORY_GENRES } from '@/utils/constants'
+import mediaService from '@/api/media'
+import storiesService from '@/api/stories'
 
-const typeOptions = STORY_TYPES.map((t) => ({ label: t.replace('_', ' '), value: t }))
+const formatOptions = STORY_FORMATS.map((f) => ({ label: f.replace('_', ' '), value: f }))
 const genreOptions = STORY_GENRES.map((g) => ({ label: g, value: g }))
+
+function toSlug(title: string): string {
+  return title
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/[\s_]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+}
 
 const uploadSchema = z.object({
   title: z.string().min(1, 'Title is required').max(200),
-  synopsis: z.string().min(10, 'Synopsis must be at least 10 characters').max(2000),
-  tags: z.string(),
+  description: z.string().min(10, 'Description must be at least 10 characters').max(2000),
 })
 
 type UploadForm = z.infer<typeof uploadSchema>
 
 export default function StoryUploadPage() {
-  const [type, setType] = useState('')
-  const [genre, setGenre] = useState('')
+  const navigate = useNavigate()
+  const [format, setFormat] = useState('')
+  const [primaryGenre, setPrimaryGenre] = useState('')
+  const [coverFile, setCoverFile] = useState<File | null>(null)
   const [coverPreview, setCoverPreview] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors },
   } = useForm<UploadForm>({
     resolver: zodResolver(uploadSchema),
   })
 
+  const title = watch('title', '')
+  const slug = toSlug(title)
+
   const handleCoverChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
+      setCoverFile(file)
       setCoverPreview(URL.createObjectURL(file))
     }
   }, [])
 
-  const onSubmit = (_data: UploadForm) => {
-    // Will be connected to API
+  const onSubmit = async (data: UploadForm) => {
+    if (!format) {
+      toast.error('Please select a format')
+      return
+    }
+
+    if (!slug) {
+      toast.error('Title must produce a valid slug')
+      return
+    }
+
+    setIsSubmitting(true)
+
+    try {
+      let coverImageUrl: string | undefined
+      let thumbnailImageUrl: string | undefined
+
+      if (coverFile) {
+        const uploadRes = await mediaService.upload(coverFile, 'COVER')
+        coverImageUrl = uploadRes.data.secureUrl
+        thumbnailImageUrl = uploadRes.data.thumbnailUrl
+      }
+
+      await storiesService.create({
+        title: data.title,
+        slug,
+        description: data.description,
+        format: format as 'NOVEL' | 'COMIC',
+        primaryGenre: primaryGenre || undefined,
+        coverImageUrl,
+        thumbnailImageUrl,
+      })
+
+      toast.success('Story created successfully')
+      navigate('/stories')
+    } catch {
+      // Error toast is handled by axios interceptor
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -56,31 +115,30 @@ export default function StoryUploadPage() {
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             <Input label="Title" placeholder="Enter story title" error={errors.title?.message} {...register('title')} />
 
+            {slug && (
+              <p className="text-xs text-gray-400 -mt-3">
+                Slug: <span className="font-mono">{slug}</span>
+              </p>
+            )}
+
             <div className="grid grid-cols-2 gap-4">
-              <Select label="Type" options={typeOptions} value={type} onChange={setType} placeholder="Select type..." />
+              <Select label="Format" options={formatOptions} value={format} onChange={setFormat} placeholder="Select format..." />
               <Select
                 label="Genre"
                 options={genreOptions}
-                value={genre}
-                onChange={setGenre}
+                value={primaryGenre}
+                onChange={setPrimaryGenre}
                 placeholder="Select genre..."
                 searchable
               />
             </div>
 
             <Textarea
-              label="Synopsis"
-              placeholder="Write a brief synopsis..."
+              label="Description"
+              placeholder="Write a brief description..."
               rows={5}
-              error={errors.synopsis?.message}
-              {...register('synopsis')}
-            />
-
-            <Input
-              label="Tags"
-              placeholder="fantasy, adventure, magic (comma separated)"
-              error={errors.tags?.message}
-              {...register('tags')}
+              error={errors.description?.message}
+              {...register('description')}
             />
 
             {/* Cover Image Dropzone */}
@@ -93,7 +151,7 @@ export default function StoryUploadPage() {
                   <>
                     <GoogleMaterialIcon name="cloud_upload" size={48} className="text-gray-400 mb-2" />
                     <p className="text-sm text-gray-500">Click to upload cover image</p>
-                    <p className="text-xs text-gray-400 mt-1">PNG, JPG, WebP up to 5MB</p>
+                    <p className="text-xs text-gray-400 mt-1">PNG, JPG, WebP up to 10MB</p>
                   </>
                 )}
                 <input type="file" accept="image/*" onChange={handleCoverChange} className="hidden" />
@@ -101,11 +159,11 @@ export default function StoryUploadPage() {
             </div>
 
             <div className="flex gap-3 pt-4">
-              <Button type="submit" variant="outline" icon="save">
+              <Button type="submit" variant="outline" icon="save" disabled={isSubmitting}>
                 Save Draft
               </Button>
-              <Button type="submit" icon="send">
-                Submit for Review
+              <Button type="submit" icon="send" disabled={isSubmitting}>
+                {isSubmitting ? 'Uploading...' : 'Submit for Review'}
               </Button>
             </div>
           </form>
